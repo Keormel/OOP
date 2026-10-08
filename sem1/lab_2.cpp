@@ -1,31 +1,11 @@
 #include <iostream>
 #include <initializer_list>
 #include <string>
+#include <vector>
 
 class PriorityQueue {
 private:
-    int* data;     // массив
-    int count;     // сколько чисел в очереди
-    int capacity;  // на сколько чисел выделена память
-
-    // увеличивает выделенную память, если места не хватает
-    void grow() {
-        int newCapacity;
-        if (capacity == 0) {
-            newCapacity = 4;
-        } else {
-            newCapacity = capacity * 2;
-        }
-
-        int* newData = new int[newCapacity];
-        for (int i = 0; i < count; i++) {
-            newData[i] = data[i];
-        }
-
-        delete[] data;
-        data = newData;
-        capacity = newCapacity;
-    }
+    std::vector<int> data; // элементы кучи; память вектор выделяет и освобождает сам
 
     // поднимает элемент вверх, пока он больше своего родителя
     void siftUp(int index) {
@@ -43,6 +23,7 @@ private:
 
     // опускает элемент вниз, пока он меньше кого-то из детей
     void siftDown(int index) {
+        int count = data.size();
         while (true) {
             int left = 2 * index + 1;
             int right = 2 * index + 2;
@@ -66,30 +47,22 @@ private:
     }
 
 public:
-    // деструктор - освобождает память
+    // деструктор - вектор сам освобождает свою память, делать ничего не нужно
     ~PriorityQueue() {
-        delete[] data;
     }
 
     // конструктор по умолчанию - пустая очередь
     PriorityQueue() {
-        data = nullptr;
-        count = 0;
-        capacity = 0;
     }
 
     // конструктор с размером - пустая очередь, но память сразу выделена под n элементов
     PriorityQueue(int n) {
-        count = 0;
-        capacity = n;
-        data = new int[capacity];
+        data.reserve(n);
     }
 
     // конструктор из списка {5, 1, 3} - кладём элементы по одному
     PriorityQueue(std::initializer_list<int> list) {
-        count = 0;
-        capacity = list.size();
-        data = new int[capacity];
+        data.reserve(list.size());
         for (int value : list) {
             push(value);
         }
@@ -97,56 +70,37 @@ public:
 
     // конструктор из обычного массива + его размера
     PriorityQueue(int arr[], int n) {
-        count = 0;
-        capacity = n;
-        data = new int[capacity];
+        data.reserve(n);
         for (int i = 0; i < n; i++) {
             push(arr[i]);
         }
     }
 
-    // конструктор копирования - делаем свою отдельную копию данных
+    // конструктор копирования - вектор копирует все элементы в свою память
     PriorityQueue(const PriorityQueue& other) {
-        count = other.count;
-        capacity = other.capacity;
-        data = new int[capacity];
-        for (int i = 0; i < count; i++) {
-            data[i] = other.data[i];
-        }
+        data = other.data;
     }
 
-    // конструктор переноса - просто забираем указатель у другого объекта
+    // конструктор переноса - забираем память вектора у другого объекта
     PriorityQueue(PriorityQueue&& other) {
-        data = other.data;
-        count = other.count;
-        capacity = other.capacity;
-
-        other.data = nullptr;
-        other.count = 0;
-        other.capacity = 0;
+        data = std::move(other.data);
+        other.data.clear();
     }
 
     // очищает очередь
     void clear() {
-        delete[] data;
-        data = nullptr;
-        count = 0;
-        capacity = 0;
+        data.clear();
     }
 
     // добавляет элемент в очередь
     void push(int value) {
-        if (count == capacity) {
-            grow();
-        }
-        data[count] = value;
-        count++;
-        siftUp(count - 1);
+        data.push_back(value);
+        siftUp(data.size() - 1);
     }
 
     // возвращает самый большой элемент (0, если очередь пустая)
     int top() {
-        if (count == 0) {
+        if (data.empty()) {
             return 0;
         }
         return data[0];
@@ -154,54 +108,38 @@ public:
 
     // удаляет самый большой элемент
     void pop() {
-        if (count == 0) {
+        if (data.empty()) {
             return;
         }
-        data[0] = data[count - 1]; // последний элемент ставим на место корня
-        count--;
+        data[0] = data.back(); // последний элемент ставим на место корня
+        data.pop_back();
         siftDown(0);
     }
 
     // проверяет, пустая ли очередь
     bool empty() {
-        return count == 0;
+        return data.empty();
     }
 
     // возвращает количество элементов
     int size() {
-        return count;
+        return data.size();
     }
 
-    // меняет местами содержимое двух очередей
+    // меняет местами содержимое двух очередей (вектора обмениваются памятью, без копирования)
     void swap(PriorityQueue& other) {
-        int* tempData = data;
-        int tempCount = count;
-        int tempCapacity = capacity;
-
-        data = other.data;
-        count = other.count;
-        capacity = other.capacity;
-
-        other.data = tempData;
-        other.count = tempCount;
-        other.capacity = tempCapacity;
+        data.swap(other.data);
     }
 
-    // сравнивает две очереди на равенство (статический метод)
-    // одинаковые элементы могут лежать в куче в разном порядке,
-    // поэтому сравниваем копии, доставая элементы по одному сверху
+
     static bool is_equal(PriorityQueue& a, PriorityQueue& b) {
-        if (a.count != b.count) {
+        if (a.data.size() != b.data.size()) {
             return false;
         }
-        PriorityQueue copyA(a);
-        PriorityQueue copyB(b);
-        while (!copyA.empty()) {
-            if (copyA.top() != copyB.top()) {
+        for (size_t i = 0; i < a.data.size(); i++) {
+            if (a.data[i] != b.data[i]) {
                 return false;
             }
-            copyA.pop();
-            copyB.pop();
         }
         return true;
     }

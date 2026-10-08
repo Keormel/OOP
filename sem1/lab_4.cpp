@@ -3,33 +3,13 @@
 #include <sstream>
 #include <initializer_list>
 #include <string>
+#include <vector>
 
 // Очередь с приоритетом. Сверху всегда лежит самое маленькое число (min-куча),
 // поэтому числа, добавленные по возрастанию, лежат в массиве в том же порядке.
 class PriorityQueue {
 private:
-    int* data;     // массив
-    int len;       // сколько чисел в очереди
-    int capacity;  // на сколько чисел выделена память
-
-    // увеличивает выделенную память, если места не хватает
-    void grow() {
-        int newCapacity;
-        if (capacity == 0) {
-            newCapacity = 4;
-        } else {
-            newCapacity = capacity * 2;
-        }
-
-        int* newData = new int[newCapacity];
-        for (int i = 0; i < len; i++) {
-            newData[i] = data[i];
-        }
-
-        delete[] data;
-        data = newData;
-        capacity = newCapacity;
-    }
+    std::vector<int> data; // элементы кучи; память вектор выделяет и освобождает сам
 
     // поднимает элемент вверх, пока он меньше своего родителя
     void siftUp(int index) {
@@ -47,6 +27,7 @@ private:
 
     // опускает элемент вниз, пока он больше кого-то из детей
     void siftDown(int index) {
+        int len = data.size();
         while (true) {
             int left = 2 * index + 1;
             int right = 2 * index + 2;
@@ -71,30 +52,22 @@ private:
 
 public:
 
-    // деструктор - освобождает память
+    // деструктор - вектор сам освобождает свою память, делать ничего не нужно
     ~PriorityQueue() {
-        delete[] data;
     }
 
     // конструктор по умолчанию - пустая очередь
     PriorityQueue() {
-        data = nullptr;
-        len = 0;
-        capacity = 0;
     }
 
     // конструктор с размером - пустая очередь, но память сразу выделена под n элементов
     PriorityQueue(int n) {
-        len = 0;
-        capacity = n;
-        data = new int[capacity];
+        data.reserve(n);
     }
 
     // конструктор из списка {5, 1, 3} - кладём элементы по одному
     PriorityQueue(std::initializer_list<int> list) {
-        len = 0;
-        capacity = list.size();
-        data = new int[capacity];
+        data.reserve(list.size());
         for (int value : list) {
             push(value);
         }
@@ -102,56 +75,37 @@ public:
 
     // конструктор из обычного массива + его размера
     PriorityQueue(int arr[], int n) {
-        len = 0;
-        capacity = n;
-        data = new int[capacity];
+        data.reserve(n);
         for (int i = 0; i < n; i++) {
             push(arr[i]);
         }
     }
 
-    // конструктор копирования - делаем свою отдельную копию данных
+    // конструктор копирования - вектор копирует все элементы в свою память
     PriorityQueue(const PriorityQueue& other) {
-        len = other.len;
-        capacity = other.capacity;
-        data = new int[capacity];
-        for (int i = 0; i < len; i++) {
-            data[i] = other.data[i];
-        }
+        data = other.data;
     }
 
-    // конструктор переноса - просто забираем указатель у другого объекта
+    // конструктор переноса - забираем память вектора у другого объекта
     PriorityQueue(PriorityQueue&& other) {
-        data = other.data;
-        len = other.len;
-        capacity = other.capacity;
-
-        other.data = nullptr;
-        other.len = 0;
-        other.capacity = 0;
+        data = std::move(other.data);
+        other.data.clear();
     }
 
     // очищает очередь
     void clear() {
-        delete[] data;
-        data = nullptr;
-        len = 0;
-        capacity = 0;
+        data.clear();
     }
 
     // добавляет элемент в очередь
     void push(int value) {
-        if (len == capacity) {
-            grow();
-        }
-        data[len] = value;
-        len++;
-        siftUp(len - 1);
+        data.push_back(value);
+        siftUp(data.size() - 1);
     }
 
     // возвращает самый маленький элемент (0, если очередь пустая)
     int top() {
-        if (len == 0) {
+        if (data.empty()) {
             return 0;
         }
         return data[0];
@@ -159,47 +113,37 @@ public:
 
     // удаляет самый маленький элемент
     void pop() {
-        if (len == 0) {
+        if (data.empty()) {
             return;
         }
-        data[0] = data[len - 1]; // последний элемент ставим на место корня
-        len--;
+        data[0] = data.back(); // последний элемент ставим на место корня
+        data.pop_back();
         siftDown(0);
     }
 
     // проверяет, пустая ли очередь
     bool empty() {
-        return len == 0;
+        return data.empty();
     }
 
     // возвращает количество элементов
     int size() {
-        return len;
+        return data.size();
     }
 
     // то же самое, что size() - так называется в проверочном main
     int length() {
-        return len;
+        return data.size();
     }
 
-    // меняет местами содержимое двух очередей
+    // меняет местами содержимое двух очередей (вектора обмениваются памятью, без копирования)
     void swap(PriorityQueue& other) {
-        int* tempData = data;
-        int tempLen = len;
-        int tempCapacity = capacity;
-
-        data = other.data;
-        len = other.len;
-        capacity = other.capacity;
-
-        other.data = tempData;
-        other.len = tempLen;
-        other.capacity = tempCapacity;
+        data.swap(other.data);
     }
 
     // одинаковые элементы могут лежать в куче в разном порядке
     static bool is_equal(PriorityQueue& a, PriorityQueue& b) {
-        if (a.len != b.len) {
+        if (a.size() != b.size()) {
             return false;
         }
         PriorityQueue copyA(a);
@@ -231,18 +175,7 @@ public:
 
     // оператор присваивания копированием: a = b
     PriorityQueue& operator=(const PriorityQueue& other) {
-        if (this == &other) {
-            return *this; 
-        }
-
-        delete[] data; 
-
-        len = other.len;
-        capacity = other.capacity;
-        data = new int[capacity];
-        for (int i = 0; i < len; i++) {
-            data[i] = other.data[i];
-        }
+        data = other.data; // вектор сам освобождает старую память и копирует элементы
         return *this; // возвращаем себя, чтобы работало a = b = c
     }
 
@@ -253,7 +186,7 @@ public:
 
     // есть ли число в очереди
     bool contains(int value) {
-        for (int i = 0; i < len; i++) {
+        for (size_t i = 0; i < data.size(); i++) {
             if (data[i] == value) {
                 return true;
             }
@@ -264,7 +197,7 @@ public:
     // сколько раз число встречается в очереди
     size_t count(int value) {
         size_t result = 0;
-        for (int i = 0; i < len; i++) {
+        for (size_t i = 0; i < data.size(); i++) {
             if (data[i] == value) {
                 result++;
             }
@@ -274,35 +207,17 @@ public:
 
     // равны, если одинаковой длины и все элементы на своих местах совпадают
     friend bool operator==(const PriorityQueue& a, const PriorityQueue& b) {
-        if (a.len != b.len) {
-            return false;
-        }
-        for (int i = 0; i < a.len; i++) {
-            if (a.data[i] != b.data[i]) {
-                return false;
-            }
-        }
-        return true;
+        return a.data == b.data;
     }
 
     friend bool operator!=(const PriorityQueue& a, const PriorityQueue& b) {
         return !(a == b);
     }
 
-    // сравнение как у слов в словаре: идём по элементам до первого различия
+    // сравнение как у слов в словаре: идём по элементам до первого различия,
+    // если все общие совпали - меньше та, что короче (так сравнивает сам vector)
     friend bool operator<(const PriorityQueue& a, const PriorityQueue& b) {
-        int i = 0;
-        while (i < a.len && i < b.len) {
-            if (a.data[i] < b.data[i]) {
-                return true;
-            }
-            if (a.data[i] > b.data[i]) {
-                return false;
-            }
-            i++;
-        }
-        // все общие элементы совпали - меньше та, что короче
-        return a.len < b.len;
+        return a.data < b.data;
     }
 
     // остальные сравнения выражаем через < и ==
@@ -320,7 +235,7 @@ public:
 
     // вывод: std::cout << a; печатает элементы в том порядке, как они лежат в массиве
     friend std::ostream& operator<<(std::ostream& out, const PriorityQueue& q) {
-        for (int i = 0; i < q.len; i++) {
+        for (size_t i = 0; i < q.data.size(); i++) {
             out << q.data[i] << " ";
         }
         out << std::endl;
@@ -329,7 +244,7 @@ public:
 
     // ввод: std::cin >> a; читает числа до конца потока и кладёт их в очередь
     friend std::istream& operator>>(std::istream& in, PriorityQueue& q) {
-        q.len = 0; // старое содержимое выбрасываем, память оставляем
+        q.data.clear(); // старое содержимое выбрасываем, память оставляем
         int value;
         while (in >> value) {
             q.push(value);
