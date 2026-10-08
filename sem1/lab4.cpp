@@ -70,7 +70,6 @@ private:
     }
 
 public:
-    // ---------- методы из лабораторной работы 2 ----------
 
     // деструктор - освобождает память
     ~PriorityQueue() {
@@ -198,9 +197,7 @@ public:
         other.capacity = tempCapacity;
     }
 
-    // сравнивает две очереди как наборы чисел (статический метод)
-    // одинаковые элементы могут лежать в куче в разном порядке,
-    // поэтому сравниваем копии, доставая элементы по одному сверху
+    // одинаковые элементы могут лежать в куче в разном порядке
     static bool is_equal(PriorityQueue& a, PriorityQueue& b) {
         if (a.len != b.len) {
             return false;
@@ -232,15 +229,13 @@ public:
         std::cout << std::endl;
     }
 
-    // ---------- новое в лабораторной работе 3 ----------
-
     // оператор присваивания копированием: a = b
     PriorityQueue& operator=(const PriorityQueue& other) {
         if (this == &other) {
-            return *this; // a = a - ничего делать не нужно
+            return *this; 
         }
 
-        delete[] data; // старые данные больше не нужны
+        delete[] data; 
 
         len = other.len;
         capacity = other.capacity;
@@ -252,7 +247,6 @@ public:
     }
 
     // доступ к элементу массива кучи по индексу (можно и менять: a[0] = 5)
-    // если записать сюда число, порядок кучи может нарушиться
     int& operator[](size_t index) {
         return data[index];
     }
