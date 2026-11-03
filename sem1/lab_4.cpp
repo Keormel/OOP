@@ -1,13 +1,107 @@
+#include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <iostream>
-#include <sstream>
 #include <initializer_list>
+#include <iterator>
 #include <string>
 #include <vector>
 
-// Очередь с приоритетом. Сверху всегда лежит самое маленькое число (min-куча),
-// поэтому числа, добавленные по возрастанию, лежат в массиве в том же порядке.
+// Итератор по элементам очереди. Внутри - обычный указатель на int в массиве кучи.
+// Итератор ничего не владеет: память принадлежит очереди, поэтому деструктор пустой.
+class iterator {
+public:
+    // "паспорт" итератора - эти имена ищут стандартные алгоритмы (std::equal)
+    // и std::reverse_iterator, чтобы понять, что умеет итератор
+    using iterator_category = std::bidirectional_iterator_tag; // умеет ходить вперёд и назад
+    using value_type = int;                                     // на что указывает
+    using difference_type = std::ptrdiff_t;                     // тип расстояния между итераторами
+    using pointer = int*;                                       // что возвращает ->
+    using reference = int&;                                     // что возвращает *
+
+    // деструктор - память не наша, освобождать нечего
+    ~iterator() {
+    }
+
+    // конструктор по умолчанию - итератор никуда не указывает
+    iterator() {
+        ptr = nullptr;
+    }
+
+    // конструктор копирования - указываем туда же, куда и другой итератор
+    iterator(const iterator& other) {
+        ptr = other.ptr;
+    }
+
+    // конструктор из указателя
+    iterator(int* p) {
+        ptr = p;
+    }
+
+    // присваивание: it1 = it2
+    iterator& operator=(const iterator& other) {
+        ptr = other.ptr;
+        return *this;
+    }
+
+    // префиксный ++it: сдвигаемся на следующий элемент и возвращаем себя
+    iterator& operator++() {
+        ++ptr;
+        return *this;
+    }
+
+    // постфиксный it++: сдвигаемся, но возвращаем копию "как было до сдвига"
+    // (int в скобках ничего не значит - так компилятор отличает it++ от ++it)
+    iterator operator++(int) {
+        iterator old(*this);
+        ++ptr;
+        return old;
+    }
+
+    // префиксный --it: сдвигаемся на предыдущий элемент
+    iterator& operator--() {
+        --ptr;
+        return *this;
+    }
+
+    // постфиксный it--
+    iterator operator--(int) {
+        iterator old(*this);
+        --ptr;
+        return old;
+    }
+
+    // *it - сам элемент (ссылка, поэтому можно и менять: *it = 5)
+    int& operator*() const {
+        return *ptr;
+    }
+
+    // it-> - указатель на элемент
+    int* operator->() const {
+        return ptr;
+    }
+
+    // итераторы равны, если указывают на одно и то же место
+    friend bool operator==(const iterator& a, const iterator& b) {
+        return a.ptr == b.ptr;
+    }
+
+    friend bool operator!=(const iterator& a, const iterator& b) {
+        return !(a == b);
+    }
+
+private:
+    int* ptr; // на какой элемент сейчас указываем
+};
+
+// Очередь с приоритетом из лабы 3 (min-куча: сверху самое маленькое число),
+// к которой добавлены итераторы.
 class PriorityQueue {
+public:
+    // обратный итератор берём из стандартной библиотеки: он обёртывает наш iterator
+    // и при ++ вызывает у него --, поэтому идёт от конца к началу
+    using reverse_iterator = std::reverse_iterator<iterator>;
+
 private:
     std::vector<int> data; // элементы кучи; память вектор выделяет и освобождает сам
 
@@ -50,7 +144,17 @@ private:
         }
     }
 
+    // заменяет содержимое очереди числами из values
+    void fillFrom(const std::vector<int>& values) {
+        data.clear();
+        data.reserve(values.size());
+        for (size_t i = 0; i < values.size(); i++) {
+            push(values[i]);
+        }
+    }
+
 public:
+    // ---------- методы из лабораторной работы 2 ----------
 
     // деструктор - вектор сам освобождает свою память, делать ничего не нужно
     ~PriorityQueue() {
@@ -104,7 +208,7 @@ public:
     }
 
     // возвращает самый маленький элемент (0, если очередь пустая)
-    int top() {
+    int top() const {
         if (data.empty()) {
             return 0;
         }
@@ -122,17 +226,12 @@ public:
     }
 
     // проверяет, пустая ли очередь
-    bool empty() {
+    bool empty() const {
         return data.empty();
     }
 
     // возвращает количество элементов
-    int size() {
-        return data.size();
-    }
-
-    // то же самое, что size() - так называется в проверочном main
-    int length() {
+    int size() const {
         return data.size();
     }
 
@@ -141,8 +240,9 @@ public:
         data.swap(other.data);
     }
 
-    // одинаковые элементы могут лежать в куче в разном порядке
-    static bool is_equal(PriorityQueue& a, PriorityQueue& b) {
+    // сравнивает очереди как наборы чисел: одинаковые элементы могут лежать
+    // в куче в разном порядке, поэтому достаём из копий по одному сверху
+    static bool is_equal(const PriorityQueue& a, const PriorityQueue& b) {
         if (a.size() != b.size()) {
             return false;
         }
@@ -159,7 +259,7 @@ public:
     }
 
     // печатает элементы от меньшего к большему (саму очередь не меняет)
-    void print(std::string label) {
+    void print(std::string label) const {
         std::cout << label << ": ";
         if (empty()) {
             std::cout << "(пусто)";
@@ -173,19 +273,30 @@ public:
         std::cout << std::endl;
     }
 
-    // оператор присваивания копированием: a = b
-    PriorityQueue& operator=(const PriorityQueue& other) {
-        data = other.data; // вектор сам освобождает старую память и копирует элементы
-        return *this; // возвращаем себя, чтобы работало a = b = c
+    // ---------- методы из лабораторной работы 3 ----------
+
+    // количество элементов (то же, что size())
+    int length() const {
+        return data.size();
     }
 
-    // доступ к элементу массива кучи по индексу (можно и менять: a[0] = 5)
+    // оператор присваивания копированием: a = b
+    PriorityQueue& operator=(const PriorityQueue& other) {
+        if (this == &other) {
+            return *this; // a = a - ничего делать не нужно
+        }
+        data = other.data; // вектор сам освобождает старую память и копирует элементы
+        return *this;      // возвращаем себя, чтобы работало a = b = c
+    }
+
+    // доступ к элементу массива кучи по индексу (ссылка - можно и менять: b[4] = 0)
+    // если записать сюда число, порядок кучи может нарушиться
     int& operator[](size_t index) {
         return data[index];
     }
 
     // есть ли число в очереди
-    bool contains(int value) {
+    bool contains(int value) const {
         for (size_t i = 0; i < data.size(); i++) {
             if (data[i] == value) {
                 return true;
@@ -195,7 +306,7 @@ public:
     }
 
     // сколько раз число встречается в очереди
-    size_t count(int value) {
+    size_t count(int value) const {
         size_t result = 0;
         for (size_t i = 0; i < data.size(); i++) {
             if (data[i] == value) {
@@ -205,22 +316,36 @@ public:
         return result;
     }
 
-    // равны, если одинаковой длины и все элементы на своих местах совпадают
+    // равны, если одинаковой длины и элементы на одних и тех же местах совпадают
     friend bool operator==(const PriorityQueue& a, const PriorityQueue& b) {
-        return a.data == b.data;
+        if (a.data.size() != b.data.size()) {
+            return false;
+        }
+        for (size_t i = 0; i < a.data.size(); i++) {
+            if (a.data[i] != b.data[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     friend bool operator!=(const PriorityQueue& a, const PriorityQueue& b) {
         return !(a == b);
     }
 
-    // сравнение как у слов в словаре: идём по элементам до первого различия,
-    // если все общие совпали - меньше та, что короче (так сравнивает сам vector)
+    // сравнение "как в словаре": идём по элементам до первого различия;
+    // если все общие элементы совпали - меньше та очередь, что короче
     friend bool operator<(const PriorityQueue& a, const PriorityQueue& b) {
-        return a.data < b.data;
+        size_t common = a.data.size() < b.data.size() ? a.data.size() : b.data.size();
+        for (size_t i = 0; i < common; i++) {
+            if (a.data[i] != b.data[i]) {
+                return a.data[i] < b.data[i];
+            }
+        }
+        return a.data.size() < b.data.size();
     }
 
-    // остальные сравнения выражаем через < и ==
+    // остальные сравнения выражаем через <
     friend bool operator>(const PriorityQueue& a, const PriorityQueue& b) {
         return b < a;
     }
@@ -242,43 +367,86 @@ public:
         return out;
     }
 
-    // ввод: std::cin >> a; читает числа до конца потока и кладёт их в очередь
+    // ввод: ss >> a; выбрасывает старое содержимое и читает числа до конца потока
     friend std::istream& operator>>(std::istream& in, PriorityQueue& q) {
-        q.data.clear(); // старое содержимое выбрасываем, память оставляем
+        q.data.clear(); // память, выделенная заранее (reserve), остаётся
         int value;
         while (in >> value) {
             q.push(value);
         }
         return in;
     }
+
+    // ---------- новое в лабораторной работе 4 ----------
+
+    // конструктор из пары итераторов [first, last): кладём все элементы между ними
+    PriorityQueue(iterator first, iterator last) {
+        assign(first, last);
+    }
+
+    // то же самое для обратных итераторов: PriorityQueue d(c.rbegin(), c.rend());
+    PriorityQueue(reverse_iterator first, reverse_iterator last) {
+        assign(first, last);
+    }
+
+    // итератор на первый элемент массива кучи
+    iterator begin() {
+        return iterator(data.data());
+    }
+
+    // итератор на место ПОСЛЕ последнего элемента (сам элемент там не лежит)
+    iterator end() {
+        return iterator(data.data() + data.size());
+    }
+
+    // обратный итератор на последний элемент
+    // (внутри хранит end(), а при * берёт элемент перед ним)
+    reverse_iterator rbegin() {
+        return reverse_iterator(end());
+    }
+
+    // обратный итератор на место ПЕРЕД первым элементом
+    reverse_iterator rend() {
+        return reverse_iterator(begin());
+    }
+
+    // заменяет содержимое очереди элементами из [first, last).
+    // Сначала копируем числа во временный вектор: итераторы могут указывать
+    // на эту же очередь (q.assign(q.begin(), q.end())), а clear() их бы испортил.
+    void assign(iterator first, iterator last) {
+        std::vector<int> values;
+        for (iterator it = first; it != last; ++it) {
+            values.push_back(*it);
+        }
+        fillFrom(values);
+    }
+
+    // то же самое для обратных итераторов
+    void assign(reverse_iterator first, reverse_iterator last) {
+        std::vector<int> values;
+        for (reverse_iterator it = first; it != last; ++it) {
+            values.push_back(*it);
+        }
+        fillFrom(values);
+    }
 };
 
-// код для проверки правильности выполнения задания:
+// код для проверки правильности выполнения задания
+// (abstract_data_t заменён на PriorityQueue)
 int main() {
-    std::stringstream ss{"1 3 5 7 9"};
-    PriorityQueue a(5);
-    ss >> a;
-    assert(5 == a.length());
-    assert(1 == a[0]);
-    assert(9 == a[4]);
-    std::cout << a;
-    PriorityQueue b{a};
-    assert(a == b);
-    assert(3 == b[1]);
-    assert(7 == b[3]);
-    b[4] = 0;
-    assert(0 == b[4]);
-    assert(!b.contains(9));
-    assert(b < a);
-    assert(a > b);
-    std::cout << b;
-    PriorityQueue c;
-    assert(0 == c.length());
-    c = b;
-    assert(b == c);
-    c[1] = c[2] = 7;
-    assert(7 == c[1]);
-    assert(7 == c[2]);
-    assert(3 == c.count(7));
-    std::cout << c;
+    int array[] = {19, 47, 74, 91};
+
+    PriorityQueue a(array, 4);
+    for (auto it = a.begin(); it != a.end(); ++it) std::cout << *it << " ";
+
+    PriorityQueue b(a.begin(), a.end());
+    assert(PriorityQueue::is_equal(a, b));
+    for (auto &&it : b) std::cout << it << " ";
+
+    PriorityQueue c(b.begin(), b.end());
+    assert(std::equal(c.begin(), c.end(), b.begin()));
+    for (auto it = c.rbegin(); it != c.rend(); ++it) std::cout << *it << " ";
+
+    PriorityQueue d(c.rbegin(), c.rend());
+    for (auto &&it : d) std::cout << it << " ";
 }
