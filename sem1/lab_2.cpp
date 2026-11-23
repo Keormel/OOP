@@ -2,16 +2,22 @@
 #include <initializer_list>
 #include <string>
 #include <vector>
+#include <utility>
 
+namespace lab2 {
+
+template <class Storage = std::vector<int>, bool MinHeap = false>
 class PriorityQueue {
+protected:
+    Storage data;
+
 private:
-    std::vector<int> data; // элементы кучи; память вектор выделяет и освобождает сам
 
     // поднимает элемент вверх, пока он больше своего родителя
     void siftUp(int index) {
         while (index > 0) {
             int parent = (index - 1) / 2;
-            if (data[index] <= data[parent]) {
+            if ((MinHeap ? data[index] >= data[parent] : data[index] <= data[parent])) {
                 break;
             }
             int temp = data[index];
@@ -29,10 +35,10 @@ private:
             int right = 2 * index + 2;
             int largest = index;
 
-            if (left < count && data[left] > data[largest]) {
+            if (left < count && (MinHeap ? data[left] < data[largest] : data[left] > data[largest])) {
                 largest = left;
             }
-            if (right < count && data[right] > data[largest]) {
+            if (right < count && (MinHeap ? data[right] < data[largest] : data[right] > data[largest])) {
                 largest = right;
             }
             if (largest == index) {
@@ -48,7 +54,7 @@ private:
 
 public:
     // деструктор - вектор сам освобождает свою память, делать ничего не нужно
-    ~PriorityQueue() {
+    virtual ~PriorityQueue() {
     }
 
     // конструктор по умолчанию - пустая очередь
@@ -87,6 +93,14 @@ public:
         other.data.clear();
     }
 
+    explicit PriorityQueue(Storage values) : data(std::move(values)) {
+        for (size_t index = data.size() / 2; index > 0; --index) {
+            siftDown(static_cast<int>(index - 1));
+        }
+    }
+
+    PriorityQueue& operator=(const PriorityQueue&) = default;
+
     // очищает очередь
     void clear() {
         data.clear();
@@ -99,7 +113,7 @@ public:
     }
 
     // возвращает самый большой элемент (0, если очередь пустая)
-    int top() {
+    int top() const {
         if (data.empty()) {
             return 0;
         }
@@ -117,12 +131,12 @@ public:
     }
 
     // проверяет, пустая ли очередь
-    bool empty() {
+    bool empty() const {
         return data.empty();
     }
 
     // возвращает количество элементов
-    int size() {
+    size_t size() const {
         return data.size();
     }
 
@@ -132,20 +146,24 @@ public:
     }
 
 
-    static bool is_equal(PriorityQueue& a, PriorityQueue& b) {
+    static bool is_equal(const PriorityQueue& a, const PriorityQueue& b) {
         if (a.data.size() != b.data.size()) {
             return false;
         }
-        for (size_t i = 0; i < a.data.size(); i++) {
-            if (a.data[i] != b.data[i]) {
+        PriorityQueue leftCopy(a);
+        PriorityQueue rightCopy(b);
+        while (!leftCopy.empty()) {
+            if (leftCopy.top() != rightCopy.top()) {
                 return false;
             }
+            leftCopy.pop();
+            rightCopy.pop();
         }
         return true;
     }
 
     // печатает элементы от большего к меньшему (саму очередь не меняет)
-    void print(std::string label) {
+    void print(std::string label) const {
         std::cout << label << ": ";
         if (empty()) {
             std::cout << "(пусто)";
@@ -159,6 +177,11 @@ public:
         std::cout << std::endl;
     }
 };
+
+}
+
+#ifndef LAB_2_NO_MAIN
+using PriorityQueue = lab2::PriorityQueue<>;
 
 int main() {
     std::cout << "1) Конструктор по умолчанию" << std::endl;
@@ -232,3 +255,4 @@ int main() {
 
     return 0;
 }
+#endif

@@ -1,182 +1,119 @@
+#define LAB_2_NO_MAIN
+#include "lab_2.cpp"
+#undef LAB_2_NO_MAIN
+
 #include <cassert>
-#include <iostream>
 #include <sstream>
-#include <initializer_list>
-#include <string>
-#include <vector>
 
-// Очередь с приоритетом из лабы 2, к которой добавлены операторы.
-// Отличие от лабы 2: сверху лежит самое МАЛЕНЬКОЕ число (min-куча).
-// Проверочный main ждёт, что после ввода "1 3 5 7 9" будет a[0] == 1 и a[4] == 9.
-// В max-куче в a[0] лежало бы 9, а в min-куче числа, добавленные по возрастанию,
-// ложатся в массив в том же порядке: [1, 3, 5, 7, 9].
-class PriorityQueue {
+class Vector {
 private:
-    std::vector<int> data; // элементы кучи; память вектор выделяет и освобождает сам
-
-    // поднимает элемент вверх, пока он меньше своего родителя
-    void siftUp(int index) {
-        while (index > 0) {
-            int parent = (index - 1) / 2;
-            if (data[index] >= data[parent]) {
-                break;
-            }
-            int temp = data[index];
-            data[index] = data[parent];
-            data[parent] = temp;
-            index = parent;
-        }
-    }
-
-    // опускает элемент вниз, пока он больше кого-то из детей
-    void siftDown(int index) {
-        int len = data.size();
-        while (true) {
-            int left = 2 * index + 1;
-            int right = 2 * index + 2;
-            int smallest = index;
-
-            if (left < len && data[left] < data[smallest]) {
-                smallest = left;
-            }
-            if (right < len && data[right] < data[smallest]) {
-                smallest = right;
-            }
-            if (smallest == index) {
-                break;
-            }
-
-            int temp = data[index];
-            data[index] = data[smallest];
-            data[smallest] = temp;
-            index = smallest;
-        }
-    }
+    int* elements = nullptr;
+    size_t length = 0;
+    size_t capacity = 0;
 
 public:
-    // ---------- методы из лабораторной работы 2 ----------
+    Vector() = default;
 
-    // деструктор - вектор сам освобождает свою память, делать ничего не нужно
-    ~PriorityQueue() {
-    }
-
-    // конструктор по умолчанию - пустая очередь
-    PriorityQueue() {
-    }
-
-    // конструктор с размером - пустая очередь, но память сразу выделена под n элементов
-    PriorityQueue(int n) {
-        data.reserve(n);
-    }
-
-    // конструктор из списка {5, 1, 3} - кладём элементы по одному
-    PriorityQueue(std::initializer_list<int> list) {
-        data.reserve(list.size());
-        for (int value : list) {
-            push(value);
+    Vector(std::initializer_list<int> values) {
+        reserve(values.size());
+        for (int value : values) {
+            push_back(value);
         }
     }
 
-    // конструктор из обычного массива + его размера
-    PriorityQueue(int arr[], int n) {
-        data.reserve(n);
-        for (int i = 0; i < n; i++) {
-            push(arr[i]);
+    Vector(const Vector& other) {
+        reserve(other.length);
+        for (size_t index = 0; index < other.length; ++index) {
+            elements[index] = other.elements[index];
         }
+        length = other.length;
     }
 
-    // конструктор копирования - вектор копирует все элементы в свою память
-    PriorityQueue(const PriorityQueue& other) {
-        data = other.data;
+    Vector(Vector&& other) noexcept {
+        swap(other);
     }
 
-    // конструктор переноса - забираем память вектора у другого объекта
-    PriorityQueue(PriorityQueue&& other) {
-        data = std::move(other.data);
-        other.data.clear();
+    ~Vector() {
+        delete[] elements;
     }
 
-    // очищает очередь
-    void clear() {
-        data.clear();
+    Vector& operator=(Vector other) noexcept {
+        swap(other);
+        return *this;
     }
 
-    // добавляет элемент в очередь
-    void push(int value) {
-        data.push_back(value);
-        siftUp(data.size() - 1);
-    }
-
-    // возвращает самый маленький элемент (0, если очередь пустая)
-    int top() {
-        if (data.empty()) {
-            return 0;
-        }
-        return data[0];
-    }
-
-    // удаляет самый маленький элемент
-    void pop() {
-        if (data.empty()) {
+    void reserve(size_t count) {
+        if (count <= capacity) {
             return;
         }
-        data[0] = data.back(); // последний элемент ставим на место корня
-        data.pop_back();
-        siftDown(0);
-    }
-
-    // проверяет, пустая ли очередь
-    bool empty() {
-        return data.empty();
-    }
-
-    // возвращает количество элементов
-    int size() {
-        return data.size();
-    }
-
-    // меняет местами содержимое двух очередей (вектора обмениваются памятью, без копирования)
-    void swap(PriorityQueue& other) {
-        data.swap(other.data);
-    }
-
-    // сравнивает очереди как наборы чисел: одинаковые элементы могут лежать
-    // в куче в разном порядке, поэтому достаём из копий по одному сверху
-    static bool is_equal(PriorityQueue& a, PriorityQueue& b) {
-        if (a.size() != b.size()) {
-            return false;
+        int* replacement = new int[count];
+        for (size_t index = 0; index < length; ++index) {
+            replacement[index] = elements[index];
         }
-        PriorityQueue copyA(a);
-        PriorityQueue copyB(b);
-        while (!copyA.empty()) {
-            if (copyA.top() != copyB.top()) {
-                return false;
-            }
-            copyA.pop();
-            copyB.pop();
-        }
-        return true;
+        delete[] elements;
+        elements = replacement;
+        capacity = count;
     }
 
-    // печатает элементы от меньшего к большему (саму очередь не меняет)
-    void print(std::string label) {
-        std::cout << label << ": ";
-        if (empty()) {
-            std::cout << "(пусто)";
-        } else {
-            PriorityQueue copy(*this);
-            while (!copy.empty()) {
-                std::cout << copy.top() << " ";
-                copy.pop();
-            }
+    void push_back(int value) {
+        if (length == capacity) {
+            reserve(capacity == 0 ? 1 : capacity * 2);
         }
-        std::cout << std::endl;
+        elements[length++] = value;
     }
 
-    // ---------- новое в лабораторной работе 3 ----------
+    void pop_back() {
+        if (!empty()) {
+            --length;
+        }
+    }
 
-    // количество элементов - так называется в проверочном main (то же, что size())
-    int length() {
+    void clear() {
+        length = 0;
+    }
+
+    size_t size() const {
+        return length;
+    }
+
+    bool empty() const {
+        return length == 0;
+    }
+
+    int& operator[](size_t index) {
+        return elements[index];
+    }
+
+    const int& operator[](size_t index) const {
+        return elements[index];
+    }
+
+    int& back() {
+        return elements[length - 1];
+    }
+
+    int* data() {
+        return elements;
+    }
+
+    void swap(Vector& other) noexcept {
+        std::swap(elements, other.elements);
+        std::swap(length, other.length);
+        std::swap(capacity, other.capacity);
+    }
+};
+
+namespace lab3 {
+
+class PriorityQueue : public lab2::PriorityQueue<Vector, true> {
+public:
+    using lab2::PriorityQueue<Vector, true>::PriorityQueue;
+
+    PriorityQueue() = default;
+    PriorityQueue(const PriorityQueue&) = default;
+    PriorityQueue(PriorityQueue&&) noexcept = default;
+
+    size_t length() const {
         return data.size();
     }
 
@@ -196,8 +133,12 @@ public:
         return data[index];
     }
 
+    const int& operator[](size_t index) const {
+        return data[index];
+    }
+
     // есть ли число в очереди
-    bool contains(int value) {
+    bool contains(int value) const {
         for (size_t i = 0; i < data.size(); i++) {
             if (data[i] == value) {
                 return true;
@@ -207,7 +148,7 @@ public:
     }
 
     // сколько раз число встречается в очереди
-    size_t count(int value) {
+    size_t count(int value) const {
         size_t result = 0;
         for (size_t i = 0; i < data.size(); i++) {
             if (data[i] == value) {
@@ -280,11 +221,17 @@ public:
     }
 };
 
-// код для проверки правильности выполнения задания
-// (abstract_data_t заменён на PriorityQueue)
+}
+
+#ifndef LAB_3_NO_MAIN
+using PriorityQueue = lab3::PriorityQueue;
+
 int main() {
     std::stringstream ss{"1 3 5 7 9"};
-    PriorityQueue a(5);
+    Vector values{1, 3, 5, 7, 9};
+    PriorityQueue a(values);
+    assert(5 == a.length());
+    assert(1 == a.top());
     ss >> a;
     assert(5 == a.length());
     assert(1 == a[0]);
@@ -310,3 +257,4 @@ int main() {
     assert(3 == c.count(7));
     std::cout << c;
 }
+#endif
